@@ -31,6 +31,11 @@ public class Watki {
         for (int i = 0; i < liczbaWatkow; i++)
             zarzadzca.execute(new testerParzystosci(l));
         
+        // tym razem sztucznie przerwiemy
+        TimeUnit.SECONDS.sleep(5);
+        System.out.println("Przerywam watki");
+        zarzadzca.shutdownNow();
+        
         System.out.println("Koniec Main!");        
         
     }
@@ -79,25 +84,39 @@ public class Watki {
                 testowanyLicznik.zwieksz();
                 liczbaWywolan++;
                 
+                // miejsce na przejęcie przerwania
+                try {
+                    TimeUnit.MICROSECONDS.sleep(10);
+                } catch (InterruptedException ex) {
+                    System.out.println("przerywam: timeout");
+                    break;
+                }
+                
             }
             //System.err.println("koniec!");
         }
     }
     
-    // licznik, który nie implementuje współbieżności w dostępie 
+    // licznik, który implementuje współbieżność
+    // synchronized sprawia, że blokada zakładana jest na 
+    // instancję obiektu. Wszystkie metody synchronizowane
+    // muszą zdobyć blokadę, zanim zaczną działać
+    
     class licznikParzysty implements licznik
     {
         int licznik = 2;
         
-        // ta metoda jest problematyczna, bo watek, ktory ja wywoluje moze
-        // byc wywlaszczony w "polowie"
-        public void zwieksz()
+        // ta metoda już nie jest problematyczna, bo blokuje obiekt
+        // w czasie zmiany
+        public synchronized void zwieksz()
         {
             licznik++;
             licznik++;
         }
 
-        public int dajLicznik()
+        // ta metoda też musi być synchronizowana, żeby respektować blokadę
+        // chroniącą zwieksz
+        public synchronized int dajLicznik()
         {
             return licznik;
         }
