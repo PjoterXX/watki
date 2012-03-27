@@ -109,18 +109,18 @@ public class Watki {
         
         // ta metoda już nie jest problematyczna, bo blokuje obiekt
         // w czasie zmiany
-        public synchronized void zwieksz()
+        public void zwieksz()
         {
             try {
                 TimeUnit.MICROSECONDS.sleep(2);
             } catch (InterruptedException ex) {
                  
             }
-            //synchronized (this)
-            //{
+            synchronized (this)
+            {
                 licznik++;
                 licznik++;
-            //}
+            }
         }
 
         // ta metoda też musi być synchronizowana, żeby respektować blokadę
