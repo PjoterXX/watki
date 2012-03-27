@@ -20,89 +20,49 @@ public class Watki {
     public static void main(String[] args) throws Exception {
 
         ExecutorService zarzadzca;
-        final int liczbaWatkow = 100;
+        final int liczbaWatkow = 2;
         
         zarzadzca = Executors.newFixedThreadPool(liczbaWatkow);
         
         
-        licznik l = new licznikParzysty();
-        
-        testerParzystosci.zatrzymajWszystkie = false;
-        for (int i = 0; i < liczbaWatkow; i++)
-            zarzadzca.execute(new testerParzystosci(l));
+        zarzadzca.execute(new licznik(false));
+        zarzadzca.execute(new licznik(true));
         
         System.out.println("Koniec Main!");        
         
     }
 }
  
-    // na podstawie "Thinking in Java
 
-    // drobne zwiększenie przejrzystości
-    interface licznik
+    class licznik implements Runnable
     {
-        public int dajLicznik();
-        public void zwieksz();
-    }
-    
-    //testery parzystosci tworzone są dla testowania równoległego liczników
-    // które po wywołaniu metody "zwiększ" dają zawsze wartość parzystą.
-
-    class testerParzystosci implements Runnable
-    {
-        public static volatile boolean zatrzymajWszystkie = false;
+        public static int a = 0;
+        private boolean tryb;
         
-        licznik testowanyLicznik;
-        int liczbaWywolan = 1;
-        
-        public testerParzystosci(licznik l)
+        public licznik(boolean tryb)
         {
-            testowanyLicznik = l;
+            this.tryb = tryb;
         }
-
+                
         @Override
         public void run() {
-            int wartosc;
-            
-            while (testerParzystosci.zatrzymajWszystkie != true)
-            {
-                wartosc = testowanyLicznik.dajLicznik();
-                if (wartosc % 2 != 0)
-                {
-                    testerParzystosci.zatrzymajWszystkie = true;
-                    System.out.format("W wywołaniu: %d wykrylem blad: %s dal wartosc %d\n", 
-                            liczbaWywolan, testowanyLicznik.getClass().getName(), wartosc);
-                    
-                    return;
-                }
-                
-                testowanyLicznik.zwieksz();
-                liczbaWywolan++;
-                
-            }
+            if (tryb)
+                zwiekszaj();
+            else
+                wyswietlaj();
             //System.err.println("koniec!");
         }
-    }
-    
-    // licznik, który nie implementuje współbieżności w dostępie 
-    class licznikParzysty implements licznik
-    {
-        int licznik = 2;
         
-        // ta metoda jest problematyczna, bo watek, ktory ja wywoluje moze
-        // byc wywlaszczony w "polowie"
-        public void zwieksz()
+        private void zwiekszaj()
         {
-            licznik++;
-            licznik++;
+            while (true)
+                a++;
         }
-
-        public int dajLicznik()
+        private void wyswietlaj()
         {
-            return licznik;
+            while (true)
+                System.out.println(a);
         }
         
-        
     }
-    
 
