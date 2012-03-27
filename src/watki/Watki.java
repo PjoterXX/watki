@@ -88,7 +88,8 @@ public class Watki {
                 try {
                     TimeUnit.MICROSECONDS.sleep(10);
                 } catch (InterruptedException ex) {
-                    System.out.println("przerywam: timeout");
+                    System.out.format("przerywam: timeout po %d wywolaniach\n", 
+                            liczbaWywolan);
                     break;
                 }
                 
@@ -110,8 +111,16 @@ public class Watki {
         // w czasie zmiany
         public synchronized void zwieksz()
         {
-            licznik++;
-            licznik++;
+            try {
+                TimeUnit.MICROSECONDS.sleep(2);
+            } catch (InterruptedException ex) {
+                 
+            }
+            //synchronized (this)
+            //{
+                licznik++;
+                licznik++;
+            //}
         }
 
         // ta metoda też musi być synchronizowana, żeby respektować blokadę
