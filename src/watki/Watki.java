@@ -12,9 +12,9 @@ public class Watki {
     /**
      * @param args the command line arguments
      */
-    public static void main(String[] args) {
+    public static void main(String[] args) throws Exception {
 
-        Executor zarzadzca;
+        ExecutorService zarzadzca;
         //zarzadzca = Executors.newSingleThreadExecutor();
         //zarzadzca.execute(new inneZadanie());
         
@@ -24,6 +24,10 @@ public class Watki {
         
         
         System.out.println("Koniec Main!");
+        
+        // przerwanie watkow zawieszonych
+        TimeUnit.MILLISECONDS.sleep(1000);
+        zarzadzca.shutdownNow();
         
     }
     
