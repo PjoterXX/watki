@@ -4,6 +4,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.*;
 import java.util.concurrent.*;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 
 /**
@@ -18,106 +20,89 @@ public class Watki {
     public static void main(String[] args) throws Exception {
 
         ExecutorService zarzadzca;
+        final int liczbaWatkow = 100;
         
-        zarzadzca = Executors.newCachedThreadPool();
+        zarzadzca = Executors.newFixedThreadPool(liczbaWatkow);
         
-        // zadanie ze sleep
-        zarzadzca.execute(new zadanieZawieszoneSleep());
         
-        // zadania obslugujace wejscie wyjscie roznego rodzaju
-        zarzadzca.execute(new zadanieBlokowaneIO(System.in));
+        licznik l = new licznikParzysty();
         
-        Socket gniazdoPolaczenia = new Socket("157.158.17.12", 10103);
-        InputStream netIS = gniazdoPolaczenia.getInputStream();
-        zarzadzca.execute(new zadanieBlokowaneIO(netIS));
-        
-        // zadanie, ktore sprawdza, czy powinno sie skonczyc
-        zadanieSwiadome zs = new zadanieSwiadome();
-        zarzadzca.execute(zs);
-        
-        // najpierw przerwij zadanie "swiadome"
-        TimeUnit.MILLISECONDS.sleep(1);
-        zs.czyPrzerwac = true;
-        
-        // przerwanie watkow zawieszonych
-        TimeUnit.MILLISECONDS.sleep(1000);
-        zarzadzca.shutdownNow();
-
-        // proba zamkniecia watkow zawieszonych na operacjach IO na System.IN
-        TimeUnit.MILLISECONDS.sleep(2000);
-        System.out.println("zamykam strumien in");
-        System.in.close();
-        
-        // proba zamkniecia watkow zawieszonych na operacjach IO na gniezdzie 
-        TimeUnit.MILLISECONDS.sleep(1000);
-        gniazdoPolaczenia.close();
+        testerParzystosci.zatrzymajWszystkie = false;
+        for (int i = 0; i < liczbaWatkow; i++)
+            zarzadzca.execute(new testerParzystosci(l));
         
         System.out.println("Koniec Main!");        
         
     }
-    
-    
-    // klasa wewnetrzna z zadaniem, ktore sprawdza, czy powinno zostac wylaczone
-    private static class zadanieSwiadome implements Runnable
+}
+ 
+    // na podstawie "Thinking in Java
+
+    // drobne zwiększenie przejrzystości
+    interface licznik
     {
-        public volatile boolean czyPrzerwac = false;
-        
-        @Override
-        public void run() {
-            System.out.println("rozpoczynam zadanie SWIADOME");
-            while (czyPrzerwac == false)
-            {
-                System.out.println("*");
-            }
-            
-            System.out.println("zakonczylem dzialanie swiadomie");
-            
-        }
-        
+        public int dajLicznik();
+        public void zwieksz();
     }
     
-    
-    // klasa wewnetrzna z zadaniem blokowanym na IO
-    private static class zadanieBlokowaneIO implements Runnable
+    //testery parzystosci tworzone są dla testowania równoległego liczników
+    // które po wywołaniu metody "zwiększ" dają zawsze wartość parzystą.
+
+    class testerParzystosci implements Runnable
     {
-        private InputStream ins;
-        public zadanieBlokowaneIO(InputStream ins)
+        public static volatile boolean zatrzymajWszystkie = false;
+        
+        licznik testowanyLicznik;
+        int liczbaWywolan = 1;
+        
+        public testerParzystosci(licznik l)
         {
-            this.ins = ins;
+            testowanyLicznik = l;
         }
-        
-        @Override
-        public void run() {
-            System.out.println("Zadanie z blokowanym IO na " + ins.getClass().getName());
-            try {
-                while (true)
-                    ins.read();
-            } catch (IOException ex) {
-                if (Thread.currentThread().isInterrupted())
-                    System.out.println("bylo zgloszone przerwanie ale i tak czekalismy!");
-                System.out.println("wyjatek IO zwiazany z !" + ins.getClass().getName());
-            } 
-            
-        }
-        
-    }
-    // klasa wewnetrzna z zadaniem przysypiajacym
-    private static class zadanieZawieszoneSleep implements Runnable
-    {
 
         @Override
         public void run() {
-            System.out.println("Zadanie z przysypianiem");
-            try {
-                TimeUnit.MILLISECONDS.sleep(5000);
-                System.out.println("Zadanie z przypisaniem wypisalo komunikat");
-            } catch (InterruptedException ex) {
-                System.out.println("Nie minelo 5s, ale ktos nam przerwal...");
+            int wartosc;
+            
+            while (testerParzystosci.zatrzymajWszystkie != true)
+            {
+                wartosc = testowanyLicznik.dajLicznik();
+                if (wartosc % 2 != 0)
+                {
+                    testerParzystosci.zatrzymajWszystkie = true;
+                    System.out.format("W wywołaniu: %d wykrylem blad: %s dal wartosc %d\n", 
+                            liczbaWywolan, testowanyLicznik.getClass().getName(), wartosc);
+                    
+                    return;
+                }
+                
+                testowanyLicznik.zwieksz();
+                liczbaWywolan++;
+                
             }
-            
-            
+            //System.err.println("koniec!");
         }
+    }
+    
+    // licznik, który nie implementuje współbieżności w dostępie 
+    class licznikParzysty implements licznik
+    {
+        int licznik = 2;
+        
+        // ta metoda jest problematyczna, bo watek, ktory ja wywoluje moze
+        // byc wywlaszczony w "polowie"
+        public void zwieksz()
+        {
+            licznik++;
+            licznik++;
+        }
+
+        public int dajLicznik()
+        {
+            return licznik;
+        }
+        
         
     }
     
-}
+
