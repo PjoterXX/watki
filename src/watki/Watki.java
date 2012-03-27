@@ -1,7 +1,7 @@
 package watki;
 
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import java.util.concurrent.*;
+
 
 /**
  *
@@ -14,12 +14,13 @@ public class Watki {
      */
     public static void main(String[] args) {
 
-        Thread w1 = new zadanie();
-        Thread w2 = new Thread(new inneZadanie());
+        Executor zarzadzca;
+        //zarzadzca = Executors.newSingleThreadExecutor();
+        //zarzadzca.execute(new inneZadanie());
         
-        w1.start();
-        w2.start();
-        
+        zarzadzca = Executors.newCachedThreadPool();
+        zarzadzca.execute(new inneZadanie());
+        zarzadzca.execute(new zadanie());
         
         
         System.out.println("Koniec Main!");
