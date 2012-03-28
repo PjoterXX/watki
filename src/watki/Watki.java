@@ -25,7 +25,8 @@ public class Watki {
         zarzadzca = Executors.newFixedThreadPool(liczbaWatkow);
         
         
-        licznikParzysty l = new licznikParzysty();
+        //licznik l = new licznikParzysty();
+        licznik l = new licznikBezpieczny(new licznikParzysty());
         
         testerParzystosci.zatrzymajWszystkie = false;
         for (int i = 0; i < liczbaWatkow; i++)
@@ -57,10 +58,10 @@ public class Watki {
     {
         public static volatile boolean zatrzymajWszystkie = false;
         
-        licznikParzysty testowanyLicznik;
+        licznik testowanyLicznik;
         int liczbaWywolan = 1;
         
-        public testerParzystosci(licznikParzysty l)
+        public testerParzystosci(licznik l)
         {
             testowanyLicznik = l;
         }
@@ -71,10 +72,8 @@ public class Watki {
             
             while (testerParzystosci.zatrzymajWszystkie != true)
             {
-                synchronized (testowanyLicznik.blokada)
-                {
-                    wartosc = testowanyLicznik.dajLicznik();
-                }
+                wartosc = testowanyLicznik.dajLicznik();
+                
                 if (wartosc % 2 != 0)
                 {
                     testerParzystosci.zatrzymajWszystkie = true;
@@ -84,7 +83,7 @@ public class Watki {
                     return;
                 }
                 
-                //synchronized {testowanyLicznik.bl
+                
                 testowanyLicznik.zwieksz();
                 liczbaWywolan++;
                 
@@ -101,15 +100,37 @@ public class Watki {
             //System.err.println("koniec!");
         }
     }
-    
-    // licznik, który jest bezpieczny dla współbieżności
-    // pod warunkiem, że w trakcie czytania każdy klient uzyska publiczną blokadę
-    // .blokada 
-    
+
+
+
+    // licznik, który nie jest bezpieczny dla współbieżności
+    class licznikBezpieczny implements licznik
+    {
+        private licznik l;
+        public licznikBezpieczny(licznik l)
+        {
+            this.l = l;
+        }
+
+        // słowo synchronized NIE jest częścią API...
+        @Override
+        public synchronized int dajLicznik() {
+            return l.dajLicznik();
+        }
+
+        @Override
+        public synchronized void zwieksz() {
+            l.zwieksz();
+        }
+        
+
+    }
+
+
+    // licznik, który nie jest bezpieczny dla współbieżności
     class licznikParzysty implements licznik
     {
         int licznik = 2;
-        public final Object blokada = new Object();
         
         // ta metoda już nie jest problematyczna, bo blokuje obiekt
         // w czasie zmiany
@@ -120,11 +141,9 @@ public class Watki {
             } catch (InterruptedException ex) {
                  
             }
-            synchronized (this.blokada)
-            {
-                licznik++;
-                licznik++;
-            }
+            licznik++;
+            licznik++;
+
         }
 
         // ta metoda też musi być synchronizowana, żeby respektować blokadę
