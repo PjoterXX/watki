@@ -25,7 +25,7 @@ public class Watki {
         zarzadzca = Executors.newFixedThreadPool(liczbaWatkow);
         
         
-        licznik l = new licznikParzysty();
+        licznikParzysty l = new licznikParzysty();
         
         testerParzystosci.zatrzymajWszystkie = false;
         for (int i = 0; i < liczbaWatkow; i++)
@@ -57,10 +57,10 @@ public class Watki {
     {
         public static volatile boolean zatrzymajWszystkie = false;
         
-        licznik testowanyLicznik;
+        licznikParzysty testowanyLicznik;
         int liczbaWywolan = 1;
         
-        public testerParzystosci(licznik l)
+        public testerParzystosci(licznikParzysty l)
         {
             testowanyLicznik = l;
         }
@@ -71,7 +71,10 @@ public class Watki {
             
             while (testerParzystosci.zatrzymajWszystkie != true)
             {
-                wartosc = testowanyLicznik.dajLicznik();
+                synchronized (testowanyLicznik.blokada)
+                {
+                    wartosc = testowanyLicznik.dajLicznik();
+                }
                 if (wartosc % 2 != 0)
                 {
                     testerParzystosci.zatrzymajWszystkie = true;
@@ -81,6 +84,7 @@ public class Watki {
                     return;
                 }
                 
+                //synchronized {testowanyLicznik.bl
                 testowanyLicznik.zwieksz();
                 liczbaWywolan++;
                 
@@ -98,14 +102,14 @@ public class Watki {
         }
     }
     
-    // licznik, który implementuje współbieżność
-    // synchronized sprawia, że blokada zakładana jest na 
-    // instancję obiektu. Wszystkie metody synchronizowane
-    // muszą zdobyć blokadę, zanim zaczną działać
+    // licznik, który jest bezpieczny dla współbieżności
+    // pod warunkiem, że w trakcie czytania każdy klient uzyska publiczną blokadę
+    // .blokada 
     
     class licznikParzysty implements licznik
     {
         int licznik = 2;
+        public final Object blokada = new Object();
         
         // ta metoda już nie jest problematyczna, bo blokuje obiekt
         // w czasie zmiany
@@ -116,7 +120,7 @@ public class Watki {
             } catch (InterruptedException ex) {
                  
             }
-            synchronized (this)
+            synchronized (this.blokada)
             {
                 licznik++;
                 licznik++;
@@ -125,7 +129,7 @@ public class Watki {
 
         // ta metoda też musi być synchronizowana, żeby respektować blokadę
         // chroniącą zwieksz
-        public synchronized int dajLicznik()
+        public int dajLicznik()
         {
             return licznik;
         }
