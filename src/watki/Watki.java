@@ -1,13 +1,8 @@
 package watki;
 
 import java.io.IOException;
-import java.io.InputStream;
-import java.net.*;
+import java.util.*;
 import java.util.concurrent.*;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 
 /**
@@ -21,137 +16,147 @@ public class Watki {
      */
     public static void main(String[] args) throws Exception {
 
-        ExecutorService zarzadzca;
+        
         final int liczbaWatkow = 100;
         
-        zarzadzca = Executors.newFixedThreadPool(liczbaWatkow);
+        ExecutorService zarzadzcaKonsumentow = Executors.newFixedThreadPool(liczbaWatkow);
+        ExecutorService zarzadzcaProducentow = Executors.newFixedThreadPool(2);
+        
+        generatorLosowy generator = new generatorLosowy();
+        
+        // uruchom producentow
+        for (int i = 0 ; i < 2; i++)
+        {
+            zarzadzcaProducentow.execute(new producent(generator));
+        }
+        
+        // uruchom konsumentow
+        for (int i = 0 ; i < liczbaWatkow; i++)
+        {
+            zarzadzcaKonsumentow.execute(new konsument(generator, ((Integer)i).toString()) );
+        }
         
         
-        licznik l = new licznikParzysty();
-                
-        testerParzystosci.zatrzymajWszystkie = false;
-        for (int i = 0; i < liczbaWatkow; i++)
-            zarzadzca.execute(new testerParzystosci(l));
-        
-        // tym razem sztucznie przerwiemy
         TimeUnit.SECONDS.sleep(5);
-        System.out.println("Przerywam watki");
-        zarzadzca.shutdownNow();
+        zarzadzcaKonsumentow.shutdownNow();
+        zarzadzcaProducentow.shutdownNow();
+        
         
         System.out.println("Koniec Main!");        
         
     }
 }
- 
-    // na podstawie "Thinking in Java
 
-    // drobne zwiększenie przejrzystości
-    interface licznik
+
+
+class generatorLosowy
+{
+    private final Random r = new Random();
+    private Queue<Integer> dostepne;
+    public generatorLosowy()
     {
-        public int dajLicznik();
-        public void zwieksz();
+        dostepne = new LinkedList<Integer>();
+
     }
     
-    //testery parzystosci tworzone są dla testowania równoległego liczników
-    // które po wywołaniu metody "zwiększ" dają zawsze wartość parzystą.
-
-    class testerParzystosci implements Runnable
+    public synchronized void generuj()
     {
-        public static volatile boolean zatrzymajWszystkie = false;
-        
-        licznik testowanyLicznik;
-        int liczbaWywolan = 1;
-        
-        public testerParzystosci(licznik l)
+        int ile = r.nextInt(5);
+        for (int i = 0; i < ile; i++)
         {
-            testowanyLicznik = l;
-        }
-
-        @Override
-        public void run() {
-            int wartosc;
-            
-            while (testerParzystosci.zatrzymajWszystkie != true)
-            {
-                wartosc = testowanyLicznik.dajLicznik();
-                
-                if (wartosc % 2 != 0)
-                {
-                    testerParzystosci.zatrzymajWszystkie = true;
-                    System.out.format("W wywołaniu: %d wykrylem blad: %s dal wartosc %d\n", 
-                            liczbaWywolan, testowanyLicznik.getClass().getName(), wartosc);
-                    
-                    return;
-                }
-                
-                
-                testowanyLicznik.zwieksz();
-                liczbaWywolan++;
-                
-                // miejsce na przejęcie przerwania
-                try {
-                    TimeUnit.MICROSECONDS.sleep(10);
-                } catch (InterruptedException ex) {
-                    System.out.format("przerywam: timeout po %d wywolaniach\n", 
-                            liczbaWywolan);
-                    break;
-                }
-                
-            }
-            //System.err.println("koniec!");
-        }
-    }
-
-
-
-    // licznik, który nie jest bezpieczny dla współbieżności
-    class licznikParzysty implements licznik
-    {
-        int licznik = 2;
-        final Lock lock = new ReentrantLock();
-        
-        // ta metoda już nie jest problematyczna, bo blokuje obiekt
-        // w czasie zmiany
-        public void zwieksz()
-        {
+            dostepne.add(r.nextInt());
             try {
-                TimeUnit.MICROSECONDS.sleep(2);
-            } catch (InterruptedException ex) {
-                 
-            }
-            
-            lock.lock();
-            try
-            {
-                licznik++;
-                licznik++;
-                // jeśli return, to też tutaj!
-            }
-            finally // zalecany idiom, który wymusi odblokowanie 
-                    // nawet w przypadku wyjątkowym
-            {
-                lock.unlock();
-            }
-
-        }
-
-        // ta metoda też musi być synchronizowana, żeby respektować blokadę
-        // chroniącą zwieksz
-        public int dajLicznik()
-        {
-            
-            lock.lock();
-            try
-            {
-                return licznik;
-            }
-            finally 
-            {
-                lock.unlock();
+                TimeUnit.MICROSECONDS.sleep(ile);
+            } catch (InterruptedException ignore) {
+                
             }
         }
-        
-        
+        // poinformuj wszystkie wątki uśpione na blokadzie tego obiektu
+        // że sytuacja się zmieniła
+        System.out.println("Wygenerowano " + ile + " nowych liczb");
+        this.notifyAll();
     }
     
+    public synchronized  Integer daj()
+    {
+        // ta metoda blokuje obiekt, ale
+        // nie ma szansy kontynuować, dopóki
+        // lista nie będzie pełna, dlatego dobrowolnie 
+        // oddaje blokadę, usypia wątek i czeka na spełnienie warunku
+        // warunek powinien być zgłoszony skądinąd 
+        
+        try {
+            while (dostepne.isEmpty())
+                wait(); // w momencie wyjścia z wait() wiadomo, że 
+                        // coś zgłosiło zmianę (notifyAll) oraz że ta metoda
+                        // odzyskała blokadę. W związku z tym TRZEBA jeszcze
+                        // raz sprawdzić warunek i jeśli jest spełniony iść
+                        // dalej
+        } catch (InterruptedException ex) {
+            throw new RuntimeException(ex);
+        }
+        
+        return dostepne.remove();
 
+    }
+    
+}
+
+   
+class producent implements Runnable
+{
+    private generatorLosowy gen;
+
+    public producent(generatorLosowy g)
+    {
+        gen = g;
+    }
+    
+    @Override
+    public void run() {
+        try {
+            while (true)
+            {
+                gen.generuj();
+                TimeUnit.MICROSECONDS.sleep(10);
+            }
+        } catch (InterruptedException ex) {
+            System.out.println("producent konczy prace");
+        }
+            
+    }
+    
+}
+
+
+
+   
+class konsument implements Runnable
+{
+    private generatorLosowy gen;
+    String nazwa;
+    
+    public konsument(generatorLosowy g, String n)
+    {
+        gen = g;
+        nazwa = n;
+    }
+    
+    @Override
+    public void run() {
+        Integer liczba;
+        try
+        {
+            while (true)
+            {
+                liczba = gen.daj();
+                System.out.format("Konsument %s dostal %d\n", nazwa, liczba);
+                TimeUnit.MICROSECONDS.sleep(1000);
+            }
+        } catch (InterruptedException ex)
+        {
+            System.out.println("Konsument " + nazwa + " konczy prace");
+        }
+    }
+    
+}
