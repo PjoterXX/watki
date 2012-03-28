@@ -4,6 +4,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.*;
 import java.util.concurrent.*;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -25,9 +27,8 @@ public class Watki {
         zarzadzca = Executors.newFixedThreadPool(liczbaWatkow);
         
         
-        //licznik l = new licznikParzysty();
-        licznik l = new licznikBezpieczny(new licznikParzysty());
-        
+        licznik l = new licznikParzysty();
+                
         testerParzystosci.zatrzymajWszystkie = false;
         for (int i = 0; i < liczbaWatkow; i++)
             zarzadzca.execute(new testerParzystosci(l));
@@ -104,33 +105,10 @@ public class Watki {
 
 
     // licznik, który nie jest bezpieczny dla współbieżności
-    class licznikBezpieczny implements licznik
-    {
-        private licznik l;
-        public licznikBezpieczny(licznik l)
-        {
-            this.l = l;
-        }
-
-        // słowo synchronized NIE jest częścią API...
-        @Override
-        public synchronized int dajLicznik() {
-            return l.dajLicznik();
-        }
-
-        @Override
-        public synchronized void zwieksz() {
-            l.zwieksz();
-        }
-        
-
-    }
-
-
-    // licznik, który nie jest bezpieczny dla współbieżności
     class licznikParzysty implements licznik
     {
         int licznik = 2;
+        final Lock lock = new ReentrantLock();
         
         // ta metoda już nie jest problematyczna, bo blokuje obiekt
         // w czasie zmiany
@@ -141,8 +119,19 @@ public class Watki {
             } catch (InterruptedException ex) {
                  
             }
-            licznik++;
-            licznik++;
+            
+            lock.lock();
+            try
+            {
+                licznik++;
+                licznik++;
+                // jeśli return, to też tutaj!
+            }
+            finally // zalecany idiom, który wymusi odblokowanie 
+                    // nawet w przypadku wyjątkowym
+            {
+                lock.unlock();
+            }
 
         }
 
@@ -150,7 +139,16 @@ public class Watki {
         // chroniącą zwieksz
         public int dajLicznik()
         {
-            return licznik;
+            
+            lock.lock();
+            try
+            {
+                return licznik;
+            }
+            finally 
+            {
+                lock.unlock();
+            }
         }
         
         
