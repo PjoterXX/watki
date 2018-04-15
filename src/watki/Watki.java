@@ -27,7 +27,7 @@ public class Watki {
         // zadania obslugujace wejscie wyjscie roznego rodzaju
         zarzadzca.execute(new zadanieBlokowaneIO(System.in));
         
-        Socket gniazdoPolaczenia = new Socket("157.158.17.12", 10103);
+        Socket gniazdoPolaczenia = new Socket("157.158.62.96", 10103);
         InputStream netIS = gniazdoPolaczenia.getInputStream();
         zarzadzca.execute(new zadanieBlokowaneIO(netIS));
         
